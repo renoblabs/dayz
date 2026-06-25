@@ -1,0 +1,15 @@
+# Secrets / local environment -- never commit
+.env
+
+# Python bytecode / caches
+__pycache__/
+*.pyc
+
+# Local databases
+*.db
+
+# Test caches
+.pytest_cache/
+
+# Private keys
+keys/*.pem

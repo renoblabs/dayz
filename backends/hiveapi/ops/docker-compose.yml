@@ -9,10 +9,18 @@ services:
       - DB_URL=postgresql+psycopg://postgres:postgres@db:5432/hive
       - REDIS_URL=redis://redis:6379/0
       - JWT_ISSUER=hiveapi
-      # Set JWT_SIGNING_SECRET in a .env file or your environment; the API
-      # refuses to issue tokens while this is unset.
-      - JWT_SIGNING_SECRET=${JWT_SIGNING_SECRET:-}
+      # Local dev stack: ENV=dev enables the dev-only login shortcut (proof
+      # verification is skipped only when ENV is dev/test AND signatures are
+      # disabled). NEVER set ENV=dev in a real deployment.
+      - ENV=dev
+      # Local dev signing secret. Override via .env for anything you care about;
+      # this default exists only so the local stack can issue tokens out of the box.
+      - JWT_SIGNING_SECRET=${JWT_SIGNING_SECRET:-local-dev-signing-secret-not-for-production}
       - REQUEST_SIGNATURE_REQUIRED=false
+      # Local dev admin password so HTTP Basic admin endpoints work locally.
+      # Override via .env. Admin auth fails closed when this is unset.
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-local-dev-admin-password}
       - IDEMPOTENCY_TTL_SECONDS=600
       - MOVE_TICKET_TTL_SECONDS=90
       - LOGOUT_GRACE_SECONDS=30
@@ -32,6 +40,8 @@ services:
   db:
     image: postgres:16
     environment:
+      # Local-only default credentials. The Postgres container is reachable only
+      # on the dev machine; do NOT reuse this password for any hosted database.
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_DB=hive

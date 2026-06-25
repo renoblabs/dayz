@@ -22,13 +22,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Create FastAPI app.
+# In production, interactive API docs (Swagger UI, ReDoc, and the OpenAPI schema)
+# are disabled to avoid exposing the surface area of the API publicly.
+_docs_enabled = settings.ENV != "production"
 app = FastAPI(
     title="DayZ HiveAPI",
     description="API for DayZ server cluster synchronization",
     version="0.1.0",
-    docs_url="/docs" if settings.ADMIN_ENABLED else None,
-    redoc_url="/redoc" if settings.ADMIN_ENABLED else None,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 
 # Define Prometheus metrics
@@ -44,11 +48,16 @@ if settings.PROMETHEUS_METRICS:
         ["method", "path"]
     )
 
-# Add CORS middleware
+# Add CORS middleware.
+# Origins come from settings.CORS_ORIGINS (comma-separated). When origins are the
+# wildcard "*", credentialed requests must be disabled per the CORS spec (a wildcard
+# origin cannot be combined with Access-Control-Allow-Credentials: true).
+_cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+_cors_allow_credentials = _cors_origins != ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to specific origins
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -160,8 +169,10 @@ def _include_router(module_name: str, prefix: str, tag: str) -> None:
 _include_router("auth", "/v1/auth", "auth")
 _include_router("characters", "/v1/characters", "characters")
 _include_router("inventory", "/v1/inventory", "inventory")
-# Server stub (test utilities)
-_include_router("server_stub", "/v1/server-stub", "server-stub")
+# Server stub (test utilities). This router mints tenants/servers WITHOUT
+# authentication, so it must never be registered in production.
+if settings.ENV in ("dev", "test"):
+    _include_router("server_stub", "/v1/server-stub", "server-stub")
 
 # Admin router (optional)
 if settings.ADMIN_ENABLED:

@@ -12,10 +12,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import optional_read_secret
 from app.db.database import get_db
 from app.db.models import Trophy
 
-router = APIRouter(prefix="/api/v1/trophies", tags=["trophies"])
+router = APIRouter(
+    prefix="/api/v1/trophies",
+    tags=["trophies"],
+    dependencies=[Depends(optional_read_secret)],
+)
 
 
 def _trophy_to_dict(t: Trophy) -> dict:
@@ -77,7 +82,11 @@ async def leaderboard(db: AsyncSession = Depends(get_db)) -> dict:
 
 @router.get("/{trophy_id}/history", summary="Transfer history for a trophy")
 async def trophy_history(trophy_id: str, db: AsyncSession = Depends(get_db)) -> dict:
-    t = await db.scalar(select(Trophy).where(Trophy.id == uuid.UUID(trophy_id)))
+    try:
+        tid = uuid.UUID(trophy_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="trophy_id is not a valid UUID")
+    t = await db.scalar(select(Trophy).where(Trophy.id == tid))
     if not t:
         raise HTTPException(status_code=404, detail="Trophy not found")
     return {

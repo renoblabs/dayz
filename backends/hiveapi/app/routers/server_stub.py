@@ -9,12 +9,13 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 
+from ..config import settings
 from ..deps import get_db
 from ..db.models import Tenant, Cluster, Server, Event
 
@@ -65,6 +66,13 @@ async def bootstrap(db: Session = Depends(get_db)):
     Ensure that a tenant, cluster, and server exist for testing.
     This is idempotent - if entities already exist, returns their IDs.
     """
+    # Defense-in-depth: this handler mints tenants/servers without authentication
+    # and must only ever run in dev/test. Even though main.py only registers this
+    # router outside production, guard the handler itself so it cannot be reached
+    # in production via any other wiring.
+    if settings.ENV not in ("dev", "test"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
     # Check if tenant exists
     tenant = db.query(Tenant).first()
     if not tenant:

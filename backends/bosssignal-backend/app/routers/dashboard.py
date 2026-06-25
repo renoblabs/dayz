@@ -23,6 +23,7 @@ DATA NOTES (real vs synthetic):
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -30,11 +31,18 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import optional_read_secret
 from app.db.database import get_db
 from app.db.kb_database import get_kb_db
 from app.db.models import BossEncounter, Player, PlayerSession, ServerStatus, Trophy, AlertRule, AlertHistory
 
-router = APIRouter(prefix="/api/v1", tags=["dashboard"])
+log = logging.getLogger(__name__)
+
+router = APIRouter(
+    prefix="/api/v1",
+    tags=["dashboard"],
+    dependencies=[Depends(optional_read_secret)],
+)
 
 
 # ── Synthetic (demo) data factories ───────────────────────────────────────────
@@ -526,8 +534,9 @@ async def system_health(
     try:
         await db.execute(text("SELECT 1"))
         bs_ok = True
-    except Exception as e:
-        bs_error = str(e)[:200]
+    except Exception:
+        log.exception("system_health: bosssignal_db ping failed")
+        bs_error = "database unreachable"
 
     # KB ping + corpus stats
     kb_status = "unconfigured"
@@ -557,9 +566,10 @@ async def system_health(
                     "embedded":      embedded,
                     "embed_percent": round(100 * embedded / total, 1) if total else 0,
                 }
-        except Exception as e:
+        except Exception:
+            log.exception("system_health: kb_db ping/corpus query failed")
             kb_status = "unreachable"
-            kb_error = str(e)[:200]
+            kb_error = "kb database unreachable"
 
     # Snapshotter freshness — read from intel.server_snapshots
     snap: dict = {"status": "unknown"}
@@ -589,8 +599,9 @@ async def system_health(
                 }
             else:
                 snap = {"status": "no_data"}
-        except Exception as e:
-            snap = {"status": "error", "detail": str(e)[:200]}
+        except Exception:
+            log.exception("system_health: snapshotter freshness query failed")
+            snap = {"status": "error", "detail": "snapshot query failed"}
 
     return {
         "bosssignal_db": {"status": "ok" if bs_ok else "error", "detail": bs_error},

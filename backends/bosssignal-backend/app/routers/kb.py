@@ -28,9 +28,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import optional_read_secret
 from app.db.kb_database import get_kb_db
 
-router = APIRouter(prefix="/api/v1/kb", tags=["kb"])
+router = APIRouter(
+    prefix="/api/v1/kb",
+    tags=["kb"],
+    dependencies=[Depends(optional_read_secret)],
+)
 
 # Allowed source_type filter values (mirrors the CHECK constraint on sources)
 _ALLOWED_TYPES = {

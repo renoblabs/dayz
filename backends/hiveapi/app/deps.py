@@ -5,7 +5,12 @@ This module provides dependency injection functions for database and Redis conne
 """
 
 import logging
-from typing import Generator, AsyncGenerator
+import secrets
+from typing import Generator, AsyncGenerator, Optional
+
+import jwt
+from fastapi import Header, HTTPException, status, Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -66,3 +71,75 @@ async def get_redis() -> AsyncGenerator[Redis, None]:
         raise
     finally:
         await redis.close()
+
+
+def get_authenticated_server_id(authorization: Optional[str] = Header(None)) -> str:
+    """Verify the Bearer JWT and return the authenticated server id (the ``sub`` claim).
+
+    This is the ONLY trusted source of a caller's server identity. State-changing
+    endpoints must derive ``server_id`` from this dependency and must never read it
+    from the request body. The token is verified against ``JWT_SIGNING_SECRET`` with
+    the configured algorithm, and the ``exp``, ``iss`` and ``sub`` claims are required.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or malformed Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token = authorization[len("Bearer "):].strip()
+    secret = settings.JWT_SIGNING_SECRET
+    if not secret:
+        # Fail closed: without a secret we cannot verify anything.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Server misconfigured: JWT signing secret is not set",
+        )
+    try:
+        claims = jwt.decode(
+            token,
+            secret,
+            algorithms=[settings.JWT_ALGORITHM],
+            issuer=settings.JWT_ISSUER,
+            options={"require": ["exp", "iss", "sub"]},
+        )
+    except jwt.PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    sub = claims.get("sub")
+    if not sub:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing subject claim",
+        )
+    return sub
+
+
+_admin_basic = HTTPBasic(auto_error=True)
+
+
+def require_admin(credentials: HTTPBasicCredentials = Depends(_admin_basic)) -> str:
+    """Enforce HTTP Basic auth on admin endpoints using constant-time comparison.
+
+    Fails closed: if ``ADMIN_PASSWORD`` is unset, admin access is *disabled* (403),
+    never silently open.
+    """
+    expected_user = settings.ADMIN_USERNAME or ""
+    expected_pass = settings.ADMIN_PASSWORD or ""
+    if not expected_pass:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access is disabled (no ADMIN_PASSWORD configured)",
+        )
+    user_ok = secrets.compare_digest(credentials.username, expected_user)
+    pass_ok = secrets.compare_digest(credentials.password, expected_pass)
+    if not (user_ok and pass_ok):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid admin credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username

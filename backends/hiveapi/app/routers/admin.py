@@ -17,15 +17,17 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..deps import get_db
+from ..deps import get_db, require_admin
 from ..db.models import Player, Character, Server, Event
 from ..services.events import get_recent_events
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Create router
-router = APIRouter()
+# Create router. The entire admin surface (overview, events listing, and the
+# SSE event stream) is protected by HTTP Basic auth via ``require_admin``,
+# which fails closed when ADMIN_PASSWORD is unset.
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 @router.get("/overview")
 async def get_overview(db: Session = Depends(get_db)):

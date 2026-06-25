@@ -18,10 +18,12 @@ services:
           type: redis
           name: hive-redis
           property: connectionString
+      - key: ENV
+        value: "production"
       - key: JWT_SIGNING_SECRET
         generateValue: true
       - key: REQUEST_SIGNATURE_REQUIRED
-        value: "false"
+        value: "true"
       - key: PROMETHEUS_METRICS
         value: "true"
       - key: LOG_LEVEL
@@ -33,7 +35,7 @@ services:
       - key: ADMIN_PASSWORD
         generateValue: true
       - key: AUTO_SEED
-        value: "true"
+        value: "false"
 
   - type: redis
     name: hive-redis

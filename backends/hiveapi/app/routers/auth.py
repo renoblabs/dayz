@@ -88,10 +88,11 @@ async def server_login(
     expires_delta = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     expire = datetime.utcnow() + expires_delta
     
-    # When signature validation is disabled, skip proof verification but still
-    # sign the token with the configured signing secret.
-    if not settings.REQUEST_SIGNATURE_REQUIRED:
-        logger.info(f"Signature validation skipped for server: {server.id}")
+    # DEV-ONLY shortcut: skip proof verification when signatures are disabled AND
+    # we are not in production. In production the proof signature is always required,
+    # even if REQUEST_SIGNATURE_REQUIRED is misconfigured to False.
+    if not settings.REQUEST_SIGNATURE_REQUIRED and settings.ENV in ("dev", "test"):
+        logger.warning(f"DEV-ONLY: proof verification skipped for server: {server.id}")
 
         token_data = {
             "sub": server.id,
@@ -101,7 +102,7 @@ async def server_login(
             "cluster": server.cluster_id,
         }
 
-        token = jwt.encode(token_data, _signing_secret(), algorithm="HS256")
+        token = jwt.encode(token_data, _signing_secret(), algorithm=settings.JWT_ALGORITHM)
 
         return TokenResponse(
             access_token=token,
@@ -166,7 +167,7 @@ async def server_login(
     # NOTE: settings.JWT_ALGORITHM defaults to RS256, but tokens are signed with
     # HS256 here because RS256 private-key management is not yet wired up. The
     # signing secret is loaded strictly from config (see _signing_secret).
-    token = jwt.encode(token_data, _signing_secret(), algorithm="HS256")
+    token = jwt.encode(token_data, _signing_secret(), algorithm=settings.JWT_ALGORITHM)
 
     return TokenResponse(
         access_token=token,

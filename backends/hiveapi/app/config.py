@@ -25,7 +25,14 @@ def normalize_db_url(url: str) -> str:
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables with defaults."""
-    
+
+    # Environment
+    ENV: str = Field(
+        default="dev",
+        description="Deployment environment: 'dev', 'test', or 'production'. "
+                    "Insecure dev shortcuts are only honored when ENV is 'dev' or 'test'."
+    )
+
     # Database settings
     DB_URL: str = Field(
         default="postgresql+psycopg://postgres:postgres@localhost:5432/hive",
@@ -49,13 +56,10 @@ class Settings(BaseSettings):
         description="JWT issuer claim"
     )
     JWT_ALGORITHM: str = Field(
-        default="RS256",
-        description="JWT signing algorithm"
+        default="HS256",
+        description="JWT signing algorithm. HS256 (symmetric) using JWT_SIGNING_SECRET; "
+                    "tokens are both signed and verified with this algorithm."
     )
-    # NOTE: JWT_ALGORITHM defaults to RS256, but token signing in
-    # routers/auth.py currently uses HS256 with JWT_SIGNING_SECRET because no
-    # RS256 private-key management is wired up. Reconcile these before relying
-    # on the algorithm claim.
     JWT_SIGNING_SECRET: Optional[str] = Field(
         default=None,
         description="Secret used to sign issued JWTs (HS256). Required to issue tokens."
@@ -117,6 +121,14 @@ class Settings(BaseSettings):
         description="Admin password for Basic Auth (empty disables auth)"
     )
     
+    # CORS
+    CORS_ORIGINS: str = Field(
+        default="*",
+        description="Comma-separated allowed CORS origins. '*' allows any origin but "
+                    "credentialed requests are automatically disabled in that case "
+                    "(per the CORS spec). Set explicit origins in production."
+    )
+
     # Keys directory for server public keys
     KEYS_DIR: str = Field(
         default="./keys",

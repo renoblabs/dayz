@@ -5,6 +5,7 @@ Consolidates all read-paths used by the Enforce mod for cross-server logic.
 from __future__ import annotations
 
 import logging
+import secrets
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -22,13 +23,17 @@ router = APIRouter(prefix="/api/v1/hive", tags=["hive"])
 
 # ── Auth dependency (Same as events) ──────────────────────────────────────────
 def _verify_secret(x_bosssignal_secret: Optional[str] = Header(default=None)):
+    # The secret is accepted ONLY via the X-BossSignal-Secret header, never via
+    # a query string.
     # Refuse all requests while the shared secret is left at its placeholder.
     if settings.bosssignal_secret == "CHANGE_ME":
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Server misconfigured: set BOSSSIGNAL_SECRET.",
         )
-    if x_bosssignal_secret != settings.bosssignal_secret:
+    # Constant-time compare to avoid leaking the secret via timing.
+    provided = x_bosssignal_secret or ""
+    if not secrets.compare_digest(provided, settings.bosssignal_secret):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid secret.",

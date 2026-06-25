@@ -9,12 +9,11 @@ import uuid
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..config import settings
-from ..deps import get_db
+from ..deps import get_db, get_authenticated_server_id
 from ..db.models import Player, Character, Server, Cluster
 from ..services.events import record_character_event
 
@@ -28,13 +27,11 @@ router = APIRouter()
 class ClaimRequest(BaseModel):
     platform_uid: str
     cluster_id: str
-    server_id: str
     position: Optional[Dict[str, float]] = None
     stats: Optional[Dict[str, Any]] = None
 
 class HeartbeatRequest(BaseModel):
     character_id: str
-    server_id: str
     position: Optional[Dict[str, float]] = None
     stats: Optional[Dict[str, Any]] = None
 
@@ -49,49 +46,18 @@ class CharacterResponse(BaseModel):
     inventory_checksum: Optional[str] = None
     last_seen_at: Optional[datetime] = None
 
-def get_server_id(
-    authorization: Optional[str] = Header(None),
-    server_id: Optional[str] = None,
-):
-    """
-    Get server ID from various sources.
-    
-    In production, this would extract server_id from JWT.
-    For development, when REQUEST_SIGNATURE_REQUIRED is False,
-    it accepts server_id directly.
-    """
-    if not settings.REQUEST_SIGNATURE_REQUIRED:
-        if server_id:
-            return server_id
-        # In a real implementation, we'd extract from the JWT
-        return None
-    
-    # In production, validate JWT and extract server_id
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required"
-    )
-
 @router.post("/claim", response_model=CharacterResponse)
 async def claim_character(
     request: ClaimRequest,
     db: Session = Depends(get_db),
-    server_id: str = Depends(get_server_id),
+    server_id: str = Depends(get_authenticated_server_id),
 ):
     """
     Claim a character for a player in a specific cluster.
-    
+
     If the player doesn't exist, it will be created.
     If the character doesn't exist, it will be created.
     """
-    # Verify server exists
-    server = db.query(Server).filter(Server.id == request.server_id).first()
-    if not server:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Server not found"
-        )
-    
     # Verify cluster exists
     cluster = db.query(Cluster).filter(Cluster.id == request.cluster_id).first()
     if not cluster:
@@ -99,7 +65,20 @@ async def claim_character(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Cluster not found"
         )
-    
+
+    # Verify the authenticated server exists AND belongs to the requested cluster.
+    # This is the real server-side ownership enforcement: a server may only claim
+    # characters within its own cluster.
+    server = db.query(Server).filter(
+        Server.id == server_id,
+        Server.cluster_id == request.cluster_id,
+    ).first()
+    if not server:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Server does not belong to this cluster"
+        )
+
     # Find or create player
     player = db.query(Player).filter(Player.platform_uid == request.platform_uid).first()
     if not player:
@@ -131,7 +110,7 @@ async def claim_character(
             id=str(uuid.uuid4()),
             player_id=player.id,
             cluster_id=request.cluster_id,
-            owned_by_server=request.server_id,
+            owned_by_server=server_id,
             life_state="alive",
             position=request.position or {"x": 0, "y": 0, "z": 0},
             stats_json=request.stats or {"health": 100, "blood": 5000, "water": 100, "energy": 100},
@@ -144,7 +123,7 @@ async def claim_character(
         record_character_event(
             db=db,
             character_id=character.id,
-            server_id=request.server_id,
+            server_id=server_id,
             event_type="character_created",
             payload={"position": character.position}
         )
@@ -152,7 +131,7 @@ async def claim_character(
         logger.info(f"Created new character: {character.id} for player: {player.id}")
     else:
         # Update existing character
-        character.owned_by_server = request.server_id
+        character.owned_by_server = server_id
         character.last_seen_at = datetime.utcnow()
         
         if request.position:
@@ -169,7 +148,7 @@ async def claim_character(
         record_character_event(
             db=db,
             character_id=character.id,
-            server_id=request.server_id,
+            server_id=server_id,
             event_type="character_claimed",
             payload={"position": character.position}
         )
@@ -196,7 +175,7 @@ async def claim_character(
 async def character_heartbeat(
     request: HeartbeatRequest,
     db: Session = Depends(get_db),
-    server_id: str = Depends(get_server_id),
+    server_id: str = Depends(get_authenticated_server_id),
 ):
     """
     Update character heartbeat to keep it alive.
@@ -208,20 +187,15 @@ async def character_heartbeat(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Character not found"
         )
-    
-    # Check if server owns the character
-    if character.owned_by_server != request.server_id:
-        logger.warning(f"Server {request.server_id} attempted heartbeat for character {character.id} owned by {character.owned_by_server}")
-        
-        # For development, allow any server to update
-        if not settings.REQUEST_SIGNATURE_REQUIRED:
-            logger.info(f"Allowing heartbeat due to REQUEST_SIGNATURE_REQUIRED=False")
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Server does not own this character"
-            )
-    
+
+    # Hard ownership check: only the server that owns the character may heartbeat it.
+    if character.owned_by_server != server_id:
+        logger.warning(f"Server {server_id} attempted heartbeat for character {character.id} owned by {character.owned_by_server}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Server does not own this character"
+        )
+
     # Update character
     character.last_seen_at = datetime.utcnow()
     
@@ -239,7 +213,7 @@ async def character_heartbeat(
     record_character_event(
         db=db,
         character_id=character.id,
-        server_id=request.server_id,
+        server_id=server_id,
         event_type="character_heartbeat",
         payload={"position": character.position}
     )

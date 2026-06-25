@@ -11,6 +11,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
+import secrets
 import time
 import uuid
 from datetime import datetime, timezone
@@ -22,9 +24,12 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import optional_read_secret
 from app.config import get_settings
 from app.db.database import get_db
 from app.db.models import BossEncounter, Event, Player, PlayerSession, ServerStatus, Trophy
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/events", tags=["events"])
 settings = get_settings()
@@ -45,16 +50,19 @@ def _broadcast(event_json: str) -> None:
 # ── Auth dependency ───────────────────────────────────────────────────────────
 def _verify_secret(
     x_bosssignal_secret: Optional[str] = Header(default=None),
-    secret: Optional[str] = Query(default=None),
 ) -> None:
+    # The secret is accepted ONLY via the X-BossSignal-Secret header. It is
+    # intentionally NOT read from the URL query string — query params leak into
+    # access logs, proxies, and browser history.
     # Refuse all requests while the shared secret is left at its placeholder.
     if settings.bosssignal_secret == "CHANGE_ME":
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Server misconfigured: set BOSSSIGNAL_SECRET.",
         )
-    provided = x_bosssignal_secret or secret
-    if provided != settings.bosssignal_secret:
+    # Constant-time compare to avoid leaking the secret via timing.
+    provided = x_bosssignal_secret or ""
+    if not secrets.compare_digest(provided, settings.bosssignal_secret):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing secret.",
@@ -140,7 +148,11 @@ async def ingest_event(
     return {"status": "accepted", "event_id": str(event.id)}
 
 # ── GET /api/v1/events ────────────────────────────────────────────────────────
-@router.get("", summary="Query event history")
+@router.get(
+    "",
+    summary="Query event history",
+    dependencies=[Depends(optional_read_secret)],
+)
 async def list_events(
     server_id: Optional[str] = Query(default=None),
     event_type: Optional[str] = Query(default=None),
@@ -166,7 +178,11 @@ async def list_events(
     ]
 
 # ── SSE Stream ──────────────────────────────────────────────────────────────
-@router.get("/stream", summary="Live SSE event stream")
+@router.get(
+    "/stream",
+    summary="Live SSE event stream",
+    dependencies=[Depends(optional_read_secret)],
+)
 async def event_stream(
     server_id: Optional[str] = Query(default=None),
 ) -> StreamingResponse:

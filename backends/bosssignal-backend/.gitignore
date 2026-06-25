@@ -1,0 +1,17 @@
+# BossSignal backend — local secrets & runtime state. Never commit these.
+
+# Secrets / local config
+.env
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local databases (SQLite dev DB, etc.)
+*.db
+
+# Scratch / working dir (not source)
+scratch/
+
+# Generated dashboard build output (static assets)
+static/

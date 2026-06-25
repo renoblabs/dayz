@@ -15,6 +15,14 @@ class Settings(BaseSettings):
     # The shared-secret check refuses requests while this is left at CHANGE_ME.
     bosssignal_secret: str = "CHANGE_ME"
 
+    # When False (default), the unauthenticated READ endpoints (dashboard,
+    # bosses, trophies, servers, kb, SSE stream) stay open so the browser
+    # dashboard works without a secret. Set REQUIRE_READ_AUTH=true to also
+    # require the X-BossSignal-Secret header on those read routes (e.g. when
+    # the dashboard is fronted by its own auth and you want defence in depth).
+    # The write path (POST /api/v1/events) always requires the secret.
+    require_read_auth: bool = False
+
     # ── Database ───────────────────────────────────────────────
     database_url: str = "postgresql+asyncpg://bosssignal:bosssignal@localhost:5432/bosssignal"
 

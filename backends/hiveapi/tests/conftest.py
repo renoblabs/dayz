@@ -16,6 +16,8 @@ from app.config import settings
 
 # Provide a signing secret so token-issuing endpoints work under test.
 settings.JWT_SIGNING_SECRET = settings.JWT_SIGNING_SECRET or "test-signing-secret"
+# Tests exercise the real authenticated path; mark the env as 'test'.
+settings.ENV = "test"
 
 # Use configured database URL (PostgreSQL)
 TEST_DATABASE_URL = settings.DB_URL
@@ -155,3 +157,37 @@ def sample_character(test_db, sample_player, sample_cluster, sample_server):
     test_db.commit()
     test_db.refresh(character)
     return character
+
+
+def _bearer_for(server) -> dict:
+    """Build a valid Authorization header (Bearer JWT) for a server object."""
+    import jwt
+    from datetime import datetime, timedelta
+
+    token = jwt.encode(
+        {
+            "sub": server.id,
+            "iss": settings.JWT_ISSUER,
+            "exp": datetime.utcnow() + timedelta(minutes=60),
+            "type": "server",
+            "cluster": server.cluster_id,
+        },
+        settings.JWT_SIGNING_SECRET,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def auth_header(sample_server):
+    """A valid Bearer-token Authorization header authenticating as sample_server."""
+    return _bearer_for(sample_server)
+
+
+@pytest.fixture
+def auth_header_for():
+    """Factory fixture: build an Authorization header for an arbitrary server object.
+
+    Useful for IDOR tests (mint a token for server A, attempt to act on server B).
+    """
+    return _bearer_for

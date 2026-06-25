@@ -5,17 +5,19 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import optional_read_secret
 from app.config import get_settings
 from app.db.database import get_db
 from app.db.models import BossEncounter, ServerStatus
 
-router = APIRouter(tags=["bosses"])
+router = APIRouter(tags=["bosses"], dependencies=[Depends(optional_read_secret)])
 settings = get_settings()
 
 
@@ -251,8 +253,12 @@ async def top_damager(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    try:
+        enc_uuid = uuid.UUID(encounter_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="encounter_id is not a valid UUID")
     enc = await db.scalar(
-        select(BossEncounter).where(BossEncounter.id == encounter_id)
+        select(BossEncounter).where(BossEncounter.id == enc_uuid)
     )
     if not enc:
         raise HTTPException(status_code=404, detail="Encounter not found")

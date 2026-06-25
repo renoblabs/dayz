@@ -7,12 +7,11 @@ This module provides endpoints for character inventory management.
 import logging
 from typing import Dict, List, Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..config import settings
-from ..deps import get_db
+from ..deps import get_db, get_authenticated_server_id
 from ..db.models import Character
 from ..services.inventory import compute_inventory_checksum, apply_ops, detect_conflicts
 from ..services.events import record_inventory_event
@@ -23,16 +22,18 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter()
 
+# Resource bounds to prevent unbounded dict creation / DoS via the path-walk.
+MAX_OPS = 200
+MAX_PATH_DEPTH = 8
+
 # Define request and response models
 class ApplyInventoryRequest(BaseModel):
     character_id: str
-    server_id: str
     ops: List[Dict[str, Any]]
     base_checksum: str
 
 class SetInventoryRequest(BaseModel):
     character_id: str
-    server_id: str
     slots: Dict[str, Any]
     client_checksum: Optional[str] = None
 
@@ -42,41 +43,48 @@ class InventoryResponse(BaseModel):
     conflict: bool = False
     conflict_details: Optional[Dict[str, Any]] = None
 
-def get_server_id(
-    authorization: Optional[str] = Header(None),
-    server_id: Optional[str] = None,
-):
+
+def _validate_ops_bounds(ops: List[Dict[str, Any]]) -> None:
+    """Reject oversized op batches and deeply nested paths.
+
+    The path-walk in apply_ops creates intermediate dicts for every missing
+    segment, so an attacker could otherwise drive unbounded memory growth with
+    a single request. Caps the number of ops and the depth of each op's path.
     """
-    Get server ID from various sources.
-    
-    In production, this would extract server_id from JWT.
-    For development, when REQUEST_SIGNATURE_REQUIRED is False,
-    it accepts server_id directly.
-    """
-    if not settings.REQUEST_SIGNATURE_REQUIRED:
-        if server_id:
-            return server_id
-        # In a real implementation, we'd extract from the JWT
-        return None
-    
-    # In production, validate JWT and extract server_id
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required"
-    )
+    if len(ops) > MAX_OPS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Too many operations (max {MAX_OPS})",
+        )
+    for op in ops:
+        path = op.get("path", "") if isinstance(op, dict) else ""
+        if isinstance(path, str):
+            depth = len([p for p in path.split(".") if p]) if path else 0
+        elif isinstance(path, (list, tuple)):
+            depth = len(path)
+        else:
+            depth = 0
+        if depth > MAX_PATH_DEPTH:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Operation path too deep (max {MAX_PATH_DEPTH} segments)",
+            )
 
 @router.post("/apply", response_model=InventoryResponse)
 async def apply_inventory_ops(
     request: ApplyInventoryRequest,
     db: Session = Depends(get_db),
-    server_id: str = Depends(get_server_id),
+    server_id: str = Depends(get_authenticated_server_id),
 ):
     """
     Apply operations to a character's inventory using CRDT-like operations.
-    
+
     Requires base_checksum to match the current inventory checksum,
     otherwise reports a conflict.
     """
+    # Bound the work before touching the database.
+    _validate_ops_bounds(request.ops)
+
     # Find character
     character = db.query(Character).filter(Character.id == request.character_id).first()
     if not character:
@@ -84,20 +92,15 @@ async def apply_inventory_ops(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Character not found"
         )
-    
-    # Check if server owns the character
-    if character.owned_by_server != request.server_id:
-        logger.warning(f"Server {request.server_id} attempted inventory apply for character {character.id} owned by {character.owned_by_server}")
-        
-        # For development, allow any server to update
-        if not settings.REQUEST_SIGNATURE_REQUIRED:
-            logger.info(f"Allowing inventory apply due to REQUEST_SIGNATURE_REQUIRED=False")
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Server does not own this character"
-            )
-    
+
+    # Enforce ownership against the authenticated server id (never the body).
+    if character.owned_by_server != server_id:
+        logger.warning(f"Server {server_id} attempted inventory apply for character {character.id} owned by {character.owned_by_server}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Server does not own this character"
+        )
+
     # Check for conflicts
     current_checksum = character.inventory_checksum
     if current_checksum and current_checksum != request.base_checksum:
@@ -133,7 +136,7 @@ async def apply_inventory_ops(
         record_inventory_event(
             db=db,
             character_id=character.id,
-            server_id=request.server_id,
+            server_id=server_id,
             event_type="inventory_updated",
             checksum=new_checksum,
             payload={"op_count": len(request.ops)}
@@ -162,11 +165,11 @@ async def apply_inventory_ops(
 async def set_inventory(
     request: SetInventoryRequest,
     db: Session = Depends(get_db),
-    server_id: str = Depends(get_server_id),
+    server_id: str = Depends(get_authenticated_server_id),
 ):
     """
     Set a character's inventory to the provided slots.
-    
+
     Computes a new checksum for the inventory.
     """
     # Find character
@@ -176,20 +179,15 @@ async def set_inventory(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Character not found"
         )
-    
-    # Check if server owns the character
-    if character.owned_by_server != request.server_id:
-        logger.warning(f"Server {request.server_id} attempted inventory set for character {character.id} owned by {character.owned_by_server}")
-        
-        # For development, allow any server to update
-        if not settings.REQUEST_SIGNATURE_REQUIRED:
-            logger.info(f"Allowing inventory set due to REQUEST_SIGNATURE_REQUIRED=False")
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Server does not own this character"
-            )
-    
+
+    # Enforce ownership against the authenticated server id (never the body).
+    if character.owned_by_server != server_id:
+        logger.warning(f"Server {server_id} attempted inventory set for character {character.id} owned by {character.owned_by_server}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Server does not own this character"
+        )
+
     # Verify client checksum if provided
     if request.client_checksum:
         computed_checksum = compute_inventory_checksum(request.slots)
@@ -218,7 +216,7 @@ async def set_inventory(
         record_inventory_event(
             db=db,
             character_id=character.id,
-            server_id=request.server_id,
+            server_id=server_id,
             event_type="inventory_set",
             checksum=new_checksum
         )
