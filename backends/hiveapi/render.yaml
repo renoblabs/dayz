@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: hiveapi
+    env: docker
+    plan: starter
+    region: oregon
+    autoDeploy: true
+    dockerfilePath: ./hiveapi/ops/Dockerfile
+    dockerContext: ./hiveapi
+    healthCheckPath: /health
+    envVars:
+      - key: DB_URL
+        fromDatabase:
+          name: hive-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: hive-redis
+          property: connectionString
+      - key: JWT_SIGNING_SECRET
+        generateValue: true
+      - key: REQUEST_SIGNATURE_REQUIRED
+        value: "false"
+      - key: PROMETHEUS_METRICS
+        value: "true"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: ADMIN_ENABLED
+        value: "true"
+      - key: ADMIN_USERNAME
+        value: "admin"
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: AUTO_SEED
+        value: "true"
+
+  - type: redis
+    name: hive-redis
+    region: oregon
+    plan: starter
+    ipAllowList: []
+
+
+databases:
+  - name: hive-db
+    plan: starter
+    region: oregon
+    databaseName: hive
+    user: hive
+    ipAllowList: []

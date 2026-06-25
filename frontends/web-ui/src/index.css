@@ -1,0 +1,103 @@
+/* ─────────────────────────────────────────────────────────────────
+   DAYZ STACK · OPS DASHBOARD
+   Foundation: design tokens (oklch), body chrome (grain + vignette).
+   Source of truth: _design-handoff-staging/.../styles.css
+   ───────────────────────────────────────────────────────────────── */
+
+@import "./styles/chrome.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Surface tones — cold dead concrete with a faint infection-green wash */
+  --bg-0:        oklch(0.14 0.010 165);
+  --bg-1:        oklch(0.18 0.012 165);
+  --bg-2:        oklch(0.22 0.014 165);
+  --bg-3:        oklch(0.26 0.014 165);
+  --bg-inset:    oklch(0.11 0.008 165);
+
+  /* Bruised lines — cold green-grey */
+  --line:        oklch(0.30 0.018 165);
+  --line-soft:   oklch(0.24 0.014 165);
+  --line-hard:   oklch(0.40 0.025 165);
+
+  /* Text — bone, slightly cool & sickly */
+  --fg:          oklch(0.92 0.008 110);
+  --fg-2:        oklch(0.78 0.012 130);
+  --fg-3:        oklch(0.60 0.014 145);
+  --fg-4:        oklch(0.46 0.016 155);
+
+  /* Accent — blood rust. The only saturated voice. */
+  --amber:       oklch(0.62 0.19 28);
+  --amber-soft:  oklch(0.62 0.19 28 / 0.18);
+  --amber-line:  oklch(0.62 0.19 28 / 0.50);
+
+  /* Status semantics */
+  --ok:          oklch(0.74 0.16 150);
+  --warn:        oklch(0.78 0.15 90);
+  --bad:         oklch(0.62 0.21 22);
+  --info:        oklch(0.68 0.10 210);
+
+  /* Type */
+  --f-display:   "Oswald", "Bebas Neue", ui-sans-serif, system-ui;
+  --f-body:      "Inter", ui-sans-serif, system-ui;
+  --f-mono:      "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Geometry */
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 4px;
+
+  /* Tweakable runtime knobs (see Task 9 — TweaksPanel) */
+  --grain-opacity: 0.06;
+  --glow-strength: 1;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--bg-0);
+  color: var(--fg);
+  font-family: var(--f-body);
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  min-height: 100vh;
+  overflow-x: hidden;
+
+  /* Weathered concrete texture overlay */
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><filter id='c'><feTurbulence type='fractalNoise' baseFrequency='0.015' numOctaves='3'/><feColorMatrix values='0 0 0 0 0.4  0 0 0 0 0.42  0 0 0 0 0.40  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23c)'/></svg>");
+  background-size: 400px 400px;
+  background-attachment: fixed;
+}
+
+/* Subtle film grain over everything */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.7  0 0 0 0 0.65  0 0 0 0 0.55  0 0 0 1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Fine vignette */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.45) 100%);
+}

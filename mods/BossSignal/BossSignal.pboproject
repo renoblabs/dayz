@@ -1,0 +1,18 @@
+; BossSignal.pboproject — Addon Builder project file
+; Used by: build-pipeline/build.bat via AddonBuilder.exe
+;
+; DEVLOG: Exact .pboproject format — validate on first build.
+; If AddonBuilder ignores this file, all settings can be passed via CLI flags.
+; The build.bat already passes: -packonly -sign -prefix — this file is supplementary.
+
+prefix=BossSignal
+pboName=BossSignal
+
+; Pack scripts as-is (no binarisation — only config.cpp, models, sounds need binarisation)
+action=0
+
+; Include only script files and the config
+includesList=*.cpp;*.c;*.hpp;*.txt
+
+; Exclude editor/build artifacts
+excludesList=*.bak;*.orig;*.pboproject;Thumbs.db;.DS_Store;*.log

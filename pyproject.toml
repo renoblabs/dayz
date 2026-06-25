@@ -1,0 +1,24 @@
+[project]
+name = "dayz"
+version = "0.0.1"
+description = "Consolidated DayZ work — operations and intelligence platform, mods, backends, build pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "renoblabs"}]
+
+[tool.uv.workspace]
+# Members will be populated after Stage 3 subtree merges land the source repos.
+# Initial scaffold is empty; updated in Stage 4 to point at platform/* and backends/*.
+members = []
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["platform/kb/tests", "platform/shared/tests", "backends/hiveapi/tests"]

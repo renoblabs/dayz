@@ -1,0 +1,35 @@
+# dayz-stack — local dev stack.
+# Postgres + pgvector for KB storage. Port 5436 to dodge collisions
+# with bosssignal-backend (5432) and other local Postgres instances.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: dayz-stack-postgres
+    environment:
+      POSTGRES_USER: dayzstack
+      POSTGRES_PASSWORD: dayzstack
+      POSTGRES_DB: dayzstack
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dayzstack"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Ollama for local embeddings (nomic-embed-text). Optional — can also
+  # point shared/embeddings.py at a different host if Ollama lives elsewhere.
+  # Commented for first boot — Ollama may already be running on host.
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+
+volumes:
+  postgres-data:
+  # ollama-data:

@@ -1,0 +1,39 @@
+version: 1
+
+defaults:
+  dayz_tools_path: "/tmp/fake-dayz-tools"
+  dayz_server_path: "/tmp/fake-dayz-server"
+  signing_keys_dir: "build-pipeline/keys"
+  output_dir: "output"
+  pack_only: true
+  pbo_prefix_matches_name: true
+
+backends:
+  bosssignal:
+    kind: fastapi
+    dir: "bosssignal-backend"
+    tests: "pytest tests/ -q"
+    compose_file: null
+    health_url: "http://127.0.0.1:8080/health"
+
+mods:
+  - name: bosssignal
+    source: "bosssignal-mod"
+    pbo_name: "BossSignal"
+    mod_folder: "@BossSignal"
+    depends_on: [cf]
+    backend: bosssignal
+    enforce_config:
+      file: "scripts/3_game/BossSignalConfig.c"
+      vars:
+        SERVER_ID: "server_01"
+        BACKEND_URL: "http://127.0.0.1:8080"
+        SHARED_SECRET: "${TEST_SECRET}"
+    watch: ["scripts/**/*.c", "config.cpp"]
+
+dependencies:
+  cf:
+    name: "Community Framework"
+    workshop_id: "1559212036"
+    mod_folder: "@CommunityFramework"
+    required: true

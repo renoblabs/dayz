@@ -1,0 +1,53 @@
+version: "3.9"
+
+# One-command startup: docker compose up -d
+# Everything an operator needs: backend + Postgres + pgAdmin.
+# No cloud account required. Runs on a $5 VPS.
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     bosssignal
+      POSTGRES_PASSWORD: bosssignal
+      POSTGRES_DB:       bosssignal
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    # Host 5432 conflicts with other local Postgres containers; backend reaches db over the compose network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bosssignal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://bosssignal:bosssignal@db:5432/bosssignal
+    ports:
+      - "6700:8080"
+    volumes:
+      - ./static:/app/static:ro                            # legacy single-file dashboard (kept for /static/dashboard.html)
+      - ../../frontends/web-ui/dist:/app/dashboard:ro      # production React build (rebuild via `npm run build` in frontends/web-ui)
+
+  # Optional: pgAdmin for poking the database
+  # Remove this block in production
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    profiles: ["dev"]              # only starts with: docker compose --profile dev up
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    admin@bosssignal.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+
+volumes:
+  pg_data:

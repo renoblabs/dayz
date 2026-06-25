@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -c \"import websocket; print\\('websocket-client available:', websocket.__version__\\)\")",
+      "Bash(pip install *)",
+      "Bash(python generate_dayz_assets.py --asset 1 --count 1)",
+      "Bash(python3 -u -c ' *)",
+      "Bash(grep -E \"^\\(hero-banner|status-footer|logo-sigil|architecture-diagram|stream-\\(platform|hive|bosssignal|play\\)\\)\\\\.png$\")",
+      "Bash(git commit -m ' *)",
+      "Bash(python _rerender_v2.py)",
+      "Bash([ -f \"$OUT\" ])"
+    ]
+  }
+}

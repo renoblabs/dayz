@@ -1,0 +1,85 @@
+# modctl — source of truth for every mod in this repo.
+# See docs/superpowers/specs/2026-04-23-modctl-design.md
+
+version: 1
+
+defaults:
+  dayz_tools_path: "C:/Program Files (x86)/Steam/steamapps/common/DayZ Tools"
+  dayz_server_path: "C:/Program Files (x86)/Steam/steamapps/common/DayZServer"
+  dayz_client_path: "C:/Program Files (x86)/Steam/steamapps/common/DayZ"
+  signing_keys_dir: "../../build-pipeline/keys"
+  output_dir: "../../output"
+  deploy_client_workshop: true
+  pack_only: true
+  pbo_prefix_matches_name: true
+  # Plan 2: server runtime config (paths relative to dayz_server_path unless absolute)
+  dayz_server_exe: "DayZServer_x64.exe"
+  dayz_server_config: "serverDZ.cfg"
+  dayz_server_port: 2302
+  dayz_server_profile_dir: "profiles"
+  dayz_server_startup_params: []
+
+backends:
+  bosssignal:
+    kind: fastapi
+    dir: "bosssignal-backend"
+    tests: "pytest tests/ -q"
+    compose_file: null
+    health_url: "http://127.0.0.1:6700/health"
+
+mods:
+  - name: bosssignal
+    source: "../../mods/BossSignal"
+    pbo_name: "BossSignal"
+    mod_folder: "@BossSignal"
+    depends_on: [cf]
+    backend: bosssignal
+    enforce_config:
+      file: "scripts/3_game/BossSignalConfig.c"
+      vars:
+        SERVER_ID: "server_01"
+        BACKEND_URL: "http://127.0.0.1:6700"
+        SHARED_SECRET: "${BOSSSIGNAL_SECRET}"
+    watch: ["scripts/**/*.c", "config.cpp"]
+
+  - name: hiveapi
+    source: "../../mods/HiveApiMod"
+    pbo_name: "HiveApiMod"
+    mod_folder: "@HiveApiMod"
+    depends_on: [cf]
+    watch: ["scripts/**/*.c", "config.cpp"]
+
+  - name: trophyhunter
+    source: "../../mods/TrophyHunter"
+    pbo_name: "TrophyHunter"
+    mod_folder: "@TrophyHunter"
+    depends_on: [cf, bosssignal]
+    backend: bosssignal
+    enforce_config:
+      file: "scripts/3_game/TrophyHunterConfig.c"
+      vars:
+        SERVER_ID: "server_01"
+        BACKEND_URL: "http://127.0.0.1:6700"
+        SHARED_SECRET: "${BOSSSIGNAL_SECRET}"
+    watch: ["scripts/**/*.c", "config.cpp"]
+
+  - name: markscontent
+    source: "../../mods/MarksContent"
+    pbo_name: "MarksContent"
+    mod_folder: "@MarksContent"
+    depends_on: []
+    watch: ["config.cpp"]
+
+  # - name: testharness
+  #   source: "tools/testharness-mod"
+  #   pbo_name: "TestHarness"
+  #   mod_folder: "@TestHarness"
+  #   depends_on: [cf, bosssignal]
+  #   watch: ["scripts/**/*.c", "config.cpp"]
+
+dependencies:
+  cf:
+    name: "Community Framework"
+    workshop_id: "1559212036"
+    mod_folder: "@CommunityFramework"
+    required: true

@@ -1,0 +1,100 @@
+# modctl diagnosis rule library — Enforce / DayZ Server error patterns.
+#
+# Each rule maps a log-line regex to a structured diagnosis + optional fix.
+# Rules are applied in order; the first match wins. Add new rules at the
+# bottom to avoid shifting existing ids.
+#
+# Schema:
+#   id            — stable identifier used in logs + caching
+#   match         — regex pattern (Python re) matched against a single log line
+#   category      — error category (maps to modctl.errors.ErrorCategory)
+#   severity      — critical | warning | info
+#   confidence    — high | medium | low
+#   diagnosis     — one-line human explanation (supports {capture.N} refs)
+#   fix_template  — (optional) textual fix recipe for humans (not auto-applied)
+#   fix_action    — (optional) shell command to run as a fix
+#   can_auto_fix  — (optional) true if this rule COULD propose a code diff
+#                   (future `--auto-apply` mode; MVP always prompts)
+
+rules:
+  - id: rpt.null_identity_dereference
+    match: "NULL pointer to instance.*(?:GetIdentity|\\.GetIdentity\\(\\))"
+    category: BUILD_ERROR
+    severity: critical
+    confidence: high
+    diagnosis: "Player identity dereferenced without null check"
+    fix_template: "Wrap dereference in `if (player && player.GetIdentity())` guard."
+    can_auto_fix: true
+
+  - id: rpt.http_connection_refused
+    match: "HTTP request failed: Connection refused (127\\.0\\.0\\.1|localhost):(\\d+)"
+    category: DEPENDENCY_ERROR
+    severity: warning
+    confidence: high
+    diagnosis: "Backend unreachable at {capture.1}:{capture.2}"
+    fix_action: "modctl backend up"
+
+  - id: rpt.signing_key_missing
+    match: "Client is missing public key for.*\\.bikey"
+    category: DEPLOY_ERROR
+    severity: critical
+    confidence: high
+    diagnosis: "Server keys/ folder missing the .bikey for the loaded mod"
+    fix_action: "modctl deploy <mod>"
+
+  - id: rpt.script_compile_failed
+    match: "Script compilation failed: (.+\\.c) @ line (\\d+)"
+    category: BUILD_ERROR
+    severity: critical
+    confidence: high
+    diagnosis: "Enforce compile failure in {capture.1} line {capture.2}"
+    fix_template: "Open {capture.1}:{capture.2} and fix the referenced syntax error."
+
+  - id: rpt.undefined_function
+    match: "(?:Undefined function|ExecuteScript: Undefined function) '(\\w+)'"
+    category: BUILD_ERROR
+    severity: critical
+    confidence: medium
+    diagnosis: "Call to undefined function '{capture.1}' — renamed, removed, or typo"
+    fix_template: "Search the referenced class for the correct method name; common rename patterns: Get* → GetEncounterId*, Emit* → Fire*."
+
+  - id: rpt.missing_semicolon
+    match: "'(.*)' at line (\\d+) .*(?:expected '[;}]'|unexpected)"
+    category: BUILD_ERROR
+    severity: critical
+    confidence: high
+    diagnosis: "Syntax error at line {capture.2} — missing semicolon or brace"
+    fix_template: "Add ';' at end of line {capture.2} or close the matching brace."
+    can_auto_fix: true
+
+  - id: rpt.mission_shutdown
+    match: "\\[FATAL\\].*Mission shutdown requested"
+    category: SERVER_ERROR
+    severity: critical
+    confidence: high
+    diagnosis: "Server triggered FATAL shutdown — check preceding log lines for root cause"
+    fix_template: "Scroll up 10-20 lines in the RPT to find the error that triggered the shutdown."
+
+  - id: rpt.missing_dependency
+    match: "(?:Missing dependency|failed to load): (\\w+)"
+    category: DEPENDENCY_ERROR
+    severity: critical
+    confidence: high
+    diagnosis: "Server couldn't load required mod: {capture.1}"
+    fix_template: "Verify {capture.1} is in the -mod=... list and its .bikey is in the server's keys/ folder."
+
+  - id: rpt.modded_class_collision
+    match: "(?:Class|modded class) '(\\w+)' .* (?:already defined|conflicts with)"
+    category: CONFLICT_ERROR
+    severity: warning
+    confidence: medium
+    diagnosis: "Multiple mods override class '{capture.1}' — check load order"
+    fix_template: "Ensure dependent mods load AFTER the base mod; adjust -mod= order or depends_on in mods.yaml."
+
+  - id: rpt.json_parse_error
+    match: "JsonFileLoader.*(?:failed|parse error).*'(.+)'"
+    category: CONFIG_ERROR
+    severity: critical
+    confidence: high
+    diagnosis: "Malformed JSON file at {capture.1}"
+    fix_template: "Validate {capture.1} with a JSON linter (missing comma, trailing comma, unescaped string)."

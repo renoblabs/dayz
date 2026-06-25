@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  neo4j:
+    image: neo4j:5-community
+    container_name: dayz-memory-neo4j
+    ports:
+      - "6704:7474"   # Browser UI
+      - "6703:7687"   # Bolt protocol
+    environment:
+      # Set NEO4J_PASSWORD in your environment (or a .env file). Do not commit a real password.
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-changeme}
+      NEO4J_PLUGINS: '[]'
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    restart: unless-stopped
+
+volumes:
+  neo4j-data:
+  neo4j-logs:

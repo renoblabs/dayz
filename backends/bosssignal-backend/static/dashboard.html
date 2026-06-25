@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BossSignal — Live Network Dashboard</title>
+  <style>
+    :root {
+      --bg:        #0b0e14;
+      --bg2:       #111620;
+      --bg3:       #1a2030;
+      --border:    #1e2a3a;
+      --text:      #c9d1d9;
+      --muted:     #4a5568;
+      --accent:    #e05252;
+      --accent2:   #f97316;
+      --green:     #22c55e;
+      --blue:      #3b82f6;
+      --yellow:    #eab308;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+      --font-ui:   'Inter', 'Segoe UI', system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 13px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Trophy Hall ─────────────────────────────────── */
+    .trophy-hall {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      overflow-x: auto;
+    }
+    .trophy-hall-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .trophy-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 12px;
+      min-width: 180px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex-shrink: 0;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .trophy-card.held  { border-color: var(--yellow); }
+    .trophy-card.flash {
+      border-color: var(--accent2);
+      box-shadow: 0 0 12px rgba(249, 115, 22, 0.4);
+    }
+    .trophy-name   { font-family: var(--font-mono); font-size: 12px; color: var(--text); font-weight: 600; }
+    .trophy-holder { font-family: var(--font-mono); font-size: 11px; color: var(--yellow); }
+    .trophy-server { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+    .trophy-empty  { color: var(--muted); font-style: italic; font-size: 11px; }
+
+    /* ── Header ──────────────────────────────────────────── */
+    header {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .logo-icon {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+
+    .logo-sub {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .conn-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .conn-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+    .conn-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .conn-dot.error { background: var(--accent); }
+
+    .stat-pill {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 10px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .stat-pill span { color: var(--text); font-weight: 600; }
+
+    /* ── Layout ──────────────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      grid-template-rows: auto 1fr;
+      gap: 0;
+      height: calc(100vh - 53px);
+    }
+
+    .main-panel {
+      overflow-y: auto;
+      padding: 20px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .side-panel {
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── Section titles ───────────────────────────────────── */
+    .section-title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Server grid ─────────────────────────────────────── */
+    .server-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    .server-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      transition: border-color 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .server-card:hover { border-color: #2a3a4a; }
+
+    .server-card.has-boss {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px rgba(224, 82, 82, 0.08);
+    }
+
+    .server-card.offline { opacity: 0.45; }
+
+    /* accent line on left edge */
+    .server-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--border);
+      border-radius: 8px 0 0 8px;
+    }
+    .server-card.has-boss::before { background: var(--accent); }
+    .server-card.offline::before  { background: var(--muted); }
+    .server-card.online::before   { background: var(--green); }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .card-server-id {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+
+    .card-badge {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      padding: 2px 7px;
+      border-radius: 10px;
+      text-transform: uppercase;
+    }
+
+    .badge-online  { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    .badge-offline { background: rgba(74,85,104,0.2);  color: var(--muted); border: 1px solid var(--border); }
+    .badge-boss    { background: rgba(224,82,82,0.15);  color: var(--accent); border: 1px solid rgba(224,82,82,0.35); animation: pulse-badge 1.5s infinite; }
+
+    @keyframes pulse-badge {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.6; }
+    }
+
+    .card-stats {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .card-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .card-stat-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .card-stat-value {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: #e2e8f0;
+      line-height: 1;
+    }
+
+    /* Active boss section inside card */
+    .boss-active {
+      background: rgba(224,82,82,0.06);
+      border: 1px solid rgba(224,82,82,0.2);
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-top: 8px;
+    }
+
+    .boss-active-name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .boss-active-name::before {
+      content: '⚠';
+      font-size: 10px;
+    }
+
+    .boss-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .health-bar-wrap {
+      height: 4px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .health-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    .last-seen {
+      font-size: 9px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      margin-top: 8px;
+      text-align: right;
+    }
+
+    /* ── Kill feed ────────────────────────────────────────── */
+    .kill-feed {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .kill-entry {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--green);
+      border-radius: 0 6px 6px 0;
+      padding: 8px 10px;
+      animation: slide-in 0.25s ease;
+    }
+
+    .kill-entry.spawned {
+      border-left-color: var(--accent);
+    }
+
+    .kill-entry.despawned {
+      border-left-color: var(--muted);
+    }
+
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateX(10px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .kill-boss-name {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+
+    .kill-detail {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .kill-detail .hl { color: var(--text); }
+
+    .kill-time {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .kill-server-tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: var(--muted);
+      margin-right: 4px;
+    }
+
+    /* ── Stats table ──────────────────────────────────────── */
+    .stats-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .stats-table th {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      text-align: left;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stats-table td {
+      padding: 7px 8px;
+      border-bottom: 1px solid rgba(30,42,58,0.5);
+      font-family: var(--font-mono);
+    }
+
+    .stats-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .td-boss-type { color: #e2e8f0; font-weight: 600; }
+    .td-server    { color: var(--muted); }
+    .td-num       { color: var(--blue); text-align: right; }
+    .td-ttk       { color: var(--yellow); text-align: right; }
+    .td-kills     { color: var(--green); text-align: right; font-weight: 700; }
+
+    /* ── Leaderboard ──────────────────────────────────────── */
+    .leaderboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .leaderboard-grid { grid-template-columns: 1fr; }
+    }
+    .leaderboard-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .lb-card-title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .lb-row {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(30,42,58,0.5);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .lb-row:last-child { border-bottom: none; }
+    .lb-rank {
+      text-align: center;
+      font-weight: 700;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .lb-rank.r1 { color: var(--yellow); }
+    .lb-rank.r2 { color: #cbd5e1; }
+    .lb-rank.r3 { color: #d97706; }
+    .lb-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-count { color: var(--accent2); font-weight: 700; }
+    .lb-empty {
+      text-align: center;
+      color: var(--muted);
+      font-style: italic;
+      font-size: 11px;
+      padding: 16px 0;
+      font-family: var(--font-mono);
+    }
+
+    /* ── Empty state ──────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 32px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+    }
+
+    .empty-state .em-icon { font-size: 24px; margin-bottom: 8px; opacity: 0.4; }
+
+    /* ── Toast ────────────────────────────────────────────── */
+    #toast-area {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      max-width: 320px;
+      animation: toast-in 0.2s ease;
+    }
+
+    .toast.green { border-left-color: var(--green); }
+    .toast.blue  { border-left-color: var(--blue); }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Scrollbar ────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      BossSignal
+      <div class="logo-sub">Boss Encounter Telemetry</div>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <div class="stat-pill">Servers: <span id="hdr-server-count">—</span></div>
+    <div class="stat-pill">Players: <span id="hdr-player-count">—</span></div>
+    <div class="stat-pill">Active Bosses: <span id="hdr-boss-count">—</span></div>
+    <div class="conn-status">
+      <div class="conn-dot" id="conn-dot"></div>
+      <span id="conn-label" style="color:var(--muted)">Connecting…</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── Trophy Hall ────────────────────────────────────────── -->
+  <section class="trophy-hall" id="trophy-hall">
+    <div class="trophy-hall-label">Trophy Hall</div>
+    <div class="trophy-empty" id="trophy-empty-msg">No trophies claimed yet — waiting for the first boss kill…</div>
+  </section>
+
+<!-- ── Layout ──────────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- ── Left / main panel ────────────────────────────────── -->
+  <div class="main-panel">
+
+    <!-- Server grid -->
+    <div>
+      <div class="section-title">Server Network</div>
+      <div class="server-grid" id="server-grid">
+        <div class="empty-state">
+          <div class="em-icon">📡</div>
+          Waiting for server heartbeats…
+        </div>
+      </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div>
+      <div class="section-title">Leaderboard</div>
+      <div class="leaderboard-grid">
+        <div class="leaderboard-card">
+          <div class="lb-card-title">Top Trophy Hunters</div>
+          <div id="lb-players">
+            <div class="lb-empty">No trophies claimed yet…</div>
+          </div>
+        </div>
+        <div class="leaderboard-card">
+          <div class="lb-card-title">By Server</div>
+          <div id="lb-servers">
+            <div class="lb-empty">No trophies claimed yet…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Boss encounter history table -->
+    <div>
+      <div class="section-title">Recent Boss Encounters</div>
+      <table class="stats-table" id="boss-table">
+        <thead>
+          <tr>
+            <th>Boss</th>
+            <th>Server</th>
+            <th>Status</th>
+            <th style="text-align:right">Players</th>
+            <th style="text-align:right">TTK (min)</th>
+            <th>Killed by</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody id="boss-tbody">
+          <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;font-family:var(--font-mono);font-size:11px">No encounters yet — waiting for boss events…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ── Right / side panel ───────────────────────────────── -->
+  <div class="side-panel">
+
+    <div>
+      <div class="section-title">Live Feed</div>
+      <div class="kill-feed" id="kill-feed">
+        <div class="empty-state" id="feed-empty">
+          <div class="em-icon">📻</div>
+          Listening for events…
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ── Toast area ─────────────────────────────────────────── -->
+<div id="toast-area"></div>
+
+<script>
+  // ── State ─────────────────────────────────────────────────
+  const servers = {};       // server_id → {player_count, active_bosses, last_seen, is_online}
+  const feedItems = [];
+  const MAX_FEED = 40;
+  const MAX_TABLE_ROWS = 30;
+
+  // ── Trophy Hall ───────────────────────────────────────────
+  const TROPHY_DEFS = [
+    { cls: "WarlordsCrown",     label: "Warlord's Crown" },
+    { cls: "AbominationsJaw",   label: "Abomination's Jaw" },
+    { cls: "HeavyTankPlate",    label: "Heavy Tank Plate" },
+    { cls: "NecromancersSkull", label: "Necromancer's Skull" },
+    { cls: "HuntersFang",       label: "Hunter's Fang" },
+  ];
+
+  function buildTrophyCard(def, held) {
+    const card = document.createElement('div');
+    card.className = 'trophy-card' + (held ? ' held' : '');
+    card.id = 'trophy-' + def.cls;
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'trophy-name';
+    nameEl.textContent = def.label;
+    card.appendChild(nameEl);
+
+    const holderEl = document.createElement('div');
+    holderEl.className = 'trophy-holder';
+    holderEl.textContent = held ? held.current_holder_name : '— unclaimed';
+    card.appendChild(holderEl);
+
+    const serverEl = document.createElement('div');
+    serverEl.className = 'trophy-server';
+    serverEl.textContent = held ? held.current_server_id : '';
+    card.appendChild(serverEl);
+
+    return card;
+  }
+
+  async function refreshTrophyHall() {
+    const hall     = document.getElementById('trophy-hall');
+    const emptyMsg = document.getElementById('trophy-empty-msg');
+    let trophies = [];
+    try {
+      const res = await fetch('/api/v1/trophies');
+      trophies = await res.json();
+    } catch (e) { return; }
+
+    Array.from(hall.querySelectorAll('.trophy-card')).forEach(n => n.remove());
+
+    if (!trophies.length) {
+      emptyMsg.style.display = '';
+      return;
+    }
+    emptyMsg.style.display = 'none';
+
+    for (const def of TROPHY_DEFS) {
+      const held = trophies.find(t => t.trophy_class === def.cls);
+      hall.appendChild(buildTrophyCard(def, held));
+    }
+  }
+
+  function flashTrophy(trophyClass) {
+    const el = document.getElementById('trophy-' + trophyClass);
+    if (!el) return;
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 2500);
+  }
+
+  // ── Leaderboard ───────────────────────────────────────────
+  function rankClass(i) { return i < 3 ? 'r' + (i + 1) : ''; }
+
+  function buildLbRow(rank, label, count) {
+    const row = document.createElement('div');
+    row.className = 'lb-row';
+
+    const r = document.createElement('div');
+    r.className = 'lb-rank ' + rankClass(rank);
+    r.textContent = '#' + (rank + 1);
+    row.appendChild(r);
+
+    const n = document.createElement('div');
+    n.className = 'lb-name';
+    n.textContent = label || '—';
+    row.appendChild(n);
+
+    const c = document.createElement('div');
+    c.className = 'lb-count';
+    c.textContent = String(count);
+    row.appendChild(c);
+
+    return row;
+  }
+
+  function renderLbRows(rows, container, labelKey, fallbackKey) {
+    while (container.firstChild) container.removeChild(container.firstChild);
+    if (!rows || !rows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'lb-empty';
+      empty.textContent = 'No trophies claimed yet…';
+      container.appendChild(empty);
+      return;
+    }
+    rows.slice(0, 10).forEach((row, i) => {
+      const label = row[labelKey] || row[fallbackKey] || '—';
+      container.appendChild(buildLbRow(i, label, row.trophy_count));
+    });
+  }
+
+  async function refreshLeaderboard() {
+    let lb = { by_player: [], by_server: [] };
+    try {
+      const res = await fetch('/api/v1/trophies/leaderboard');
+      lb = await res.json();
+    } catch (e) { return; }
+
+    renderLbRows(lb.by_player, document.getElementById('lb-players'), 'player_name', 'player_id');
+    renderLbRows(lb.by_server, document.getElementById('lb-servers'), 'server_id',   'server_id');
+  }
+
+  // ── SSE connection ────────────────────────────────────────
+  let es = null;
+  let reconnectDelay = 2000;
+
+  function connect() {
+    if (es) es.close();
+
+    setConnStatus('connecting');
+    es = new EventSource('/api/v1/events/stream');
+
+    es.onopen = () => {
+      setConnStatus('live');
+      reconnectDelay = 2000;
+      toast('Stream connected', 'blue');
+    };
+
+    es.onmessage = (e) => {
+      if (!e.data || e.data === 'ping') return;
+      try {
+        const evt = JSON.parse(e.data);
+        handleEvent(evt);
+      } catch {}
+    };
+
+    es.onerror = () => {
+      setConnStatus('error');
+      es.close();
+      setTimeout(connect, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 1.5, 30000);
+    };
+  }
+
+  // ── Event handler ─────────────────────────────────────────
+  function handleEvent(evt) {
+    const type = evt.event_type;
+    const sid  = evt.server_id;
+    const data = evt.data || {};
+
+    if (evt.event_type === 'trophy.awarded' || evt.event_type === 'trophy.transferred') {
+      refreshTrophyHall();
+      refreshLeaderboard();
+      if (evt.data && evt.data.trophy_class) flashTrophy(evt.data.trophy_class);
+      return;
+    }
+
+    if (type === 'server.heartbeat') {
+      upsertServer(sid, {
+        player_count:      data.player_count ?? 0,
+        active_boss_count: data.active_boss_count ?? 0,
+        active_bosses:     data.active_bosses ?? [],
+        last_seen:         new Date(),
+        is_online:         true,
+      });
+      renderServers();
+      renderHeader();
+    }
+
+    else if (type === 'server.started') {
+      upsertServer(sid, { is_online: true, active_bosses: [], active_boss_count: 0, last_seen: new Date() });
+      renderServers();
+      toast(`${sid} came online`, 'blue');
+    }
+
+    else if (type === 'boss.spawned') {
+      const boss = {
+        boss_id:     data.boss_id,
+        boss_type:   data.boss_type,
+        display_name: data.boss_display_name || data.boss_type,
+        health_pct:  1.0,
+        elapsed:     0,
+      };
+      if (!servers[sid]) upsertServer(sid, {});
+      const s = servers[sid];
+      s.active_bosses = s.active_bosses || [];
+      s.active_bosses.push(boss);
+      s.active_boss_count = s.active_bosses.length;
+      renderServers();
+
+      addFeedItem({
+        type: 'spawned',
+        server: sid,
+        boss: data.boss_display_name || data.boss_type,
+        detail: `${data.server_player_count ?? '?'} players on server`,
+        time: new Date(),
+      });
+
+      toast(`⚠ BOSS SPAWNED — ${data.boss_display_name || data.boss_type} on ${sid}`, 'red');
+    }
+
+    else if (type === 'boss.killed') {
+      if (servers[sid]) {
+        servers[sid].active_bosses = (servers[sid].active_bosses || [])
+          .filter(b => b.boss_id !== data.boss_id);
+        servers[sid].active_boss_count = servers[sid].active_bosses.length;
+      }
+      renderServers();
+
+      const ttk = data.time_to_kill_seconds;
+      const ttkMin = ttk ? (ttk / 60).toFixed(1) : '?';
+      const killer = data.killer?.player_name || 'Unknown';
+      const parts  = data.participants?.length ?? 0;
+
+      addFeedItem({
+        type: 'killed',
+        server: sid,
+        boss: data.boss_display_name || data.boss_type,
+        detail: `Killed by ${killer} · ${parts} participants · TTK ${ttkMin}m`,
+        time: new Date(),
+      });
+
+      prependTableRow({
+        display_name: data.boss_display_name || data.boss_type,
+        server_id:    sid,
+        status:       'killed',
+        players:      data.participants?.length ?? '?',
+        ttk:          ttkMin,
+        killer:       killer,
+        time:         new Date(),
+      });
+
+      toast(`☠ ${data.boss_display_name || data.boss_type} killed by ${killer} (${ttkMin}m)`, 'green');
+    }
+
+    else if (type === 'boss.despawned') {
+      if (servers[sid]) {
+        servers[sid].active_bosses = (servers[sid].active_bosses || [])
+          .filter(b => b.boss_id !== data.boss_id);
+        servers[sid].active_boss_count = servers[sid].active_bosses.length;
+      }
+      renderServers();
+
+      addFeedItem({
+        type: 'despawned',
+        server: sid,
+        boss: data.boss_display_name || data.boss_type,
+        detail: 'Boss despawned without being killed',
+        time: new Date(),
+      });
+    }
+  }
+
+  // ── Server state ──────────────────────────────────────────
+  function upsertServer(sid, patch) {
+    if (!servers[sid]) {
+      servers[sid] = {
+        server_id: sid,
+        player_count: 0,
+        active_boss_count: 0,
+        active_bosses: [],
+        last_seen: null,
+        is_online: true,
+      };
+    }
+    Object.assign(servers[sid], patch);
+  }
+
+  // ── Render: header totals ─────────────────────────────────
+  function renderHeader() {
+    const ids = Object.keys(servers);
+    const players = ids.reduce((s, id) => s + (servers[id].player_count || 0), 0);
+    const bosses  = ids.reduce((s, id) => s + (servers[id].active_boss_count || 0), 0);
+    document.getElementById('hdr-server-count').textContent = ids.length;
+    document.getElementById('hdr-player-count').textContent = players;
+    document.getElementById('hdr-boss-count').textContent   = bosses;
+  }
+
+  // ── Render: server grid ───────────────────────────────────
+  function renderServers() {
+    const grid = document.getElementById('server-grid');
+    const ids  = Object.keys(servers).sort();
+
+    if (ids.length === 0) return;
+
+    grid.innerHTML = ids.map(sid => {
+      const s = servers[sid];
+      const hasBoss = s.active_boss_count > 0;
+      const cls = hasBoss ? 'has-boss' : (s.is_online ? 'online' : 'offline');
+      const badge = hasBoss
+        ? '<span class="card-badge badge-boss">⚡ BOSS ACTIVE</span>'
+        : s.is_online
+          ? '<span class="card-badge badge-online">Online</span>'
+          : '<span class="card-badge badge-offline">Offline</span>';
+
+      const lastSeenStr = s.last_seen
+        ? `Last ping ${timeAgo(s.last_seen)}`
+        : 'Never';
+
+      const bossSection = hasBoss ? s.active_bosses.map(b => `
+        <div class="boss-active">
+          <div class="boss-active-name">${esc(b.display_name || b.boss_type)}</div>
+          <div class="boss-meta">
+            <span>${esc(b.boss_type)}</span>
+            <span>${b.elapsed ? Math.floor(b.elapsed / 60) + 'm elapsed' : 'active'}</span>
+          </div>
+          <div class="health-bar-wrap">
+            <div class="health-bar" style="width:${Math.round((b.health_pct ?? 1) * 100)}%"></div>
+          </div>
+        </div>
+      `).join('') : '';
+
+      return `
+        <div class="server-card ${cls}">
+          <div class="card-header">
+            <div class="card-server-id">${esc(sid)}</div>
+            ${badge}
+          </div>
+          <div class="card-stats">
+            <div class="card-stat">
+              <div class="card-stat-label">Players</div>
+              <div class="card-stat-value">${s.player_count ?? '—'}</div>
+            </div>
+            <div class="card-stat">
+              <div class="card-stat-label">Active Bosses</div>
+              <div class="card-stat-value" style="color:${hasBoss ? 'var(--accent)' : 'var(--text)'}">${s.active_boss_count ?? 0}</div>
+            </div>
+          </div>
+          ${bossSection}
+          <div class="last-seen">${lastSeenStr}</div>
+        </div>`;
+    }).join('');
+
+    renderHeader();
+  }
+
+  // ── Render: kill feed ─────────────────────────────────────
+  function addFeedItem(item) {
+    feedItems.unshift(item);
+    if (feedItems.length > MAX_FEED) feedItems.pop();
+
+    const feed  = document.getElementById('kill-feed');
+    const empty = document.getElementById('feed-empty');
+    if (empty) empty.remove();
+
+    const el = document.createElement('div');
+    el.className = `kill-entry ${item.type}`;
+    el.innerHTML = `
+      <div class="kill-boss-name">
+        <span class="kill-server-tag">${esc(item.server)}</span>${esc(item.boss)}
+      </div>
+      <div class="kill-detail">${esc(item.detail)}</div>
+      <div class="kill-time">${formatTime(item.time)}</div>
+    `;
+    feed.insertBefore(el, feed.firstChild);
+
+    while (feed.children.length > MAX_FEED) {
+      feed.removeChild(feed.lastChild);
+    }
+  }
+
+  // ── Render: boss encounter table ───────────────────────────
+  function prependTableRow(row) {
+    const tbody = document.getElementById('boss-tbody');
+
+    // Remove placeholder row
+    if (tbody.rows.length === 1 && tbody.rows[0].cells.length === 1) {
+      tbody.innerHTML = '';
+    }
+
+    const statusColor = row.status === 'killed' ? 'var(--green)' : 'var(--muted)';
+    const ttkDisplay = row.ttk && row.ttk !== '?' ? row.ttk + ' min' : '—';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td-boss-type">${esc(row.display_name)}</td>
+      <td class="td-server">${esc(row.server_id)}</td>
+      <td><span style="color:${statusColor};font-family:var(--font-mono);font-size:11px">${esc(row.status)}</span></td>
+      <td class="td-num">${row.players}</td>
+      <td class="td-ttk">${ttkDisplay}</td>
+      <td style="color:var(--text)">${esc(row.killer || '—')}</td>
+      <td style="color:var(--muted);font-family:var(--font-mono);font-size:10px">${formatTime(row.time)}</td>
+    `;
+    tbody.insertBefore(tr, tbody.firstChild);
+
+    while (tbody.children.length > MAX_TABLE_ROWS) {
+      tbody.removeChild(tbody.lastChild);
+    }
+  }
+
+  // ── Bootstrap: load existing data ─────────────────────────
+  async function bootstrap() {
+    try {
+      const [serversRes, bossesRes] = await Promise.all([
+        fetch('/api/v1/servers'),
+        fetch('/api/v1/bosses?limit=30'),
+      ]);
+
+      if (serversRes.ok) {
+        const list = await serversRes.json();
+        list.forEach(s => upsertServer(s.server_id, s));
+        renderServers();
+      }
+
+      if (bossesRes.ok) {
+        const bossList = await bossesRes.json();
+        // Add in reverse so newest ends up on top after prepend
+        [...bossList].reverse().forEach(b => {
+          if (b.status !== 'active') {
+            prependTableRow({
+              display_name: b.display_name,
+              server_id:    b.server_id,
+              status:       b.status,
+              players:      b.player_count_at_spawn ?? b.participants?.length ?? '?',
+              ttk:          b.time_to_kill_minutes ?? '?',
+              killer:       b.killer?.player_name ?? '—',
+              time:         b.killed_at ? new Date(b.killed_at) : new Date(b.spawned_at),
+            });
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Bootstrap failed:', e);
+    }
+  }
+
+  // ── UI helpers ────────────────────────────────────────────
+  function setConnStatus(state) {
+    const dot   = document.getElementById('conn-dot');
+    const label = document.getElementById('conn-label');
+    dot.className = 'conn-dot';
+    if (state === 'live')       { dot.classList.add('live');  label.textContent = 'Live'; label.style.color = 'var(--green)'; }
+    else if (state === 'error') { dot.classList.add('error'); label.textContent = 'Reconnecting…'; label.style.color = 'var(--accent)'; }
+    else                        { label.textContent = 'Connecting…'; label.style.color = 'var(--muted)'; }
+  }
+
+  function toast(msg, type = 'red') {
+    const area = document.getElementById('toast-area');
+    const el   = document.createElement('div');
+    el.className = `toast ${type === 'green' ? 'green' : type === 'blue' ? 'blue' : ''}`;
+    el.textContent = msg;
+    area.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.4s'; setTimeout(() => el.remove(), 400); }, 4000);
+  }
+
+  function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function formatTime(d) {
+    if (!d) return '—';
+    try { return new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+    catch { return '—'; }
+  }
+
+  function timeAgo(d) {
+    const sec = Math.floor((Date.now() - new Date(d)) / 1000);
+    if (sec < 60)    return `${sec}s ago`;
+    if (sec < 3600)  return `${Math.floor(sec / 60)}m ago`;
+    return `${Math.floor(sec / 3600)}h ago`;
+  }
+
+  // ── Init ──────────────────────────────────────────────────
+  bootstrap().then(() => connect());
+  refreshTrophyHall();
+  refreshLeaderboard();
+
+  // Mark servers offline if no heartbeat for > 3 minutes
+  setInterval(() => {
+    const now = Date.now();
+    let changed = false;
+    Object.values(servers).forEach(s => {
+      if (s.last_seen && (now - new Date(s.last_seen)) > 180000 && s.is_online) {
+        s.is_online = false;
+        changed = true;
+      }
+    });
+    if (changed) renderServers();
+  }, 15000);
+</script>
+</body>
+</html>

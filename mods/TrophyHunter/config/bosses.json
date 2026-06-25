@@ -1,0 +1,10 @@
+{
+  "_comment": "Maps boss entity classnames to trophy item classes. The 'cls' values below are placeholder example names. Replace them with the actual entity classnames from your own boss mod, or from a licensed boss mod you run (e.g. an external Steam Workshop boss pack). TrophyHunter ships no boss entities of its own.",
+  "bosses": [
+    {"cls": "ExampleBoss_01",  "trophy": "WarlordsCrown"},
+    {"cls": "ExampleBoss_02",  "trophy": "AbominationsJaw"},
+    {"cls": "ExampleBoss_03",  "trophy": "HeavyTankPlate"},
+    {"cls": "ExampleBoss_04",  "trophy": "NecromancersSkull"},
+    {"cls": "ExampleBoss_05",  "trophy": "HuntersFang"}
+  ]
+}

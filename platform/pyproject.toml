@@ -1,0 +1,36 @@
+[project]
+name = "dayz-stack"
+version = "0.0.1"
+description = "Personal DayZ modding/server platform — knowledge base, intel, authoring, ops"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{name = "the developer"}]
+
+[tool.uv.workspace]
+members = [
+    "shared",
+    "kb",
+    "intel",
+    "config_mod",
+    "tools",
+    # "authoring",
+    # "ops",
+]
+
+[tool.uv.sources]
+dayzstack-shared = { workspace = true }
+dayzstack-kb     = { workspace = true }
+dayzstack-intel  = { workspace = true }
+dayzstack-config = { workspace = true }
+dayzstack-tools  = { workspace = true }
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests", "kb/tests", "shared/tests"]

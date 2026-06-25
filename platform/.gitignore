@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.uv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Build
+build/
+dist/
+*.egg
+
+# Local secrets (Doppler covers production)
+.env
+.env.local
+
+# Reports content (track dir, not generated reports)
+reports/*.md
+!reports/.gitkeep
+
+# DayZ-specific (keys MUST never be committed publicly)
+keys/*.biprivatekey
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker volumes
+docker/data/
+postgres-data/
+
+# Scraper caches (never commit — these are giant cloned repos + API responses)
+scraper-cache/

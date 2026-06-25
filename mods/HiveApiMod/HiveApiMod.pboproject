@@ -1,0 +1,14 @@
+; HiveApiMod.pboproject — Addon Builder project file
+; Used by: build-pipeline/build.bat
+
+prefix=HiveApiMod
+pboName=HiveApiMod
+
+; Pack scripts as-is (no binarisation)
+action=0
+
+; Include only script files and the config
+includesList=*.cpp;*.c;*.hpp;*.txt
+
+; Exclude editor/build artifacts
+excludesList=*.bak;*.orig;*.pboproject;Thumbs.db;.DS_Store;*.log

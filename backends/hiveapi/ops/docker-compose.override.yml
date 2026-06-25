@@ -1,0 +1,25 @@
+services:
+  api:
+    ports: !override
+      - "6701:8000"
+    environment:
+      # Don't double-seed: entrypoint runs `python -m scripts.seed` (basic tenant);
+      # we want only the README-documented demo_seed (Hockey Apocalypse Network).
+      AUTO_SEED: "false"
+    volumes:
+      - ../scripts:/app/scripts
+      - ../migrations:/app/migrations
+      - ../alembic.ini:/app/alembic.ini
+  db:
+    ports: !override
+      - "5435:5432"
+  redis:
+    ports: !override
+      - "6383:6379"
+  grafana:
+    ports: !override
+      - "3030:3000"
+
+  cloudflared:
+    profiles:
+      - production

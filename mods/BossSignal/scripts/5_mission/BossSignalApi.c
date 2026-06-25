@@ -1,0 +1,140 @@
+// ============================================================
+// BossSignalAPI - PUBLIC integration surface for boss mods
+// Load order : 4_world
+//
+// This is the only file a boss mod author needs to know about.
+// One RegisterBossClass call at init, one EmitBossSpawned call
+// when the boss entity spawns - BossSignal handles everything else.
+//
+// ?? INTEGRATION EXAMPLE (paste into your boss mod) ??????????
+//
+//   // In your MissionServer.OnInit() or boss spawn function:
+//   BossSignalAPI.RegisterBossClass("ExampleBoss_01", "The Warlord");
+//
+//   // When your boss entity actually spawns in the world:
+//   BossSignalAPI.EmitBossSpawned(myBossEntity, "ExampleBoss_01");
+//
+//   // That's it. BossSignal will auto-track:
+//   //   - Kill detection via OnEntityKilled hook
+//   //   - Participant damage accumulation
+//   //   - Time-to-kill calculation
+//   //   - Heartbeat health-% reporting
+//   //   - HTTP delivery to the BossSignal backend
+//
+// ?? ADVANCED: manual despawn notification ????????????????????
+//
+//   // If your boss can despawn without dying (e.g. timer-based reset):
+//   BossSignalAPI.EmitBossDespawned(myBossEntity, "ExampleBoss_01");
+//
+// ?? ADVANCED: completely custom event ????????????????????????
+//
+//   // Send any arbitrary event with a boss_id context:
+//   string bossId = BossSignalAPI.GetEntityId(myBossEntity);
+//   BossSignalAPI.EmitCustom(bossId, "boss.phase_changed",
+//       "\"phase\":2,\"msg\":\"Enrage triggered\"");
+//
+// ============================================================
+
+class BossSignalAPI {
+    // ?? Internal wiring (set by BossSignalMission.OnInit) ????
+    // Don't touch these from your boss mod.
+    static ref BossSignalEmitter                    s_Emitter;
+    static ref map<string, ref BossRegistration>    s_Registry;
+
+
+    // ?? RegisterBossClass ????????????????????????????????????
+    // Call once at server init (e.g. in your MissionServer.OnInit, after super).
+    //
+    // classname       - the DayZ entity classname your boss spawns as
+    // displayName     - human-readable name shown in the dashboard
+    // healthThreshold - optional: only treat as boss if MaxHealth >= this value
+    //                   (useful if a classname is shared with weaker variants)
+    // trackDamage     - emit per-hit PLAYER_BOSS_DAMAGE events (can be chatty)
+    // ?????????????????????????????????????????????????????????
+    static void RegisterBossClass(string classname, string displayName,
+                                  float healthThreshold = 0.0,
+                                  bool trackDamage = true) {
+        if (!s_Registry) {
+            s_Registry = new map<string, ref BossRegistration>();
+        }
+
+        ref BossRegistration reg = new BossRegistration(classname, displayName,
+                                                        healthThreshold, trackDamage);
+        s_Registry.Set(classname, reg);
+        Print("[BossSignal] Registered boss class: " + classname + " -> \"" + displayName + "\"");
+    }
+
+
+    // ?? EmitBossSpawned ??????????????????????????????????????
+    // Call immediately after your boss entity is fully spawned and positioned.
+    // BossSignal creates an encounter record and begins tracking the entity.
+    // ?????????????????????????????????????????????????????????
+    static void EmitBossSpawned(EntityAI entity, string classname) {
+        if (!entity) {
+            BossSignalConfig.Warn("EmitBossSpawned called with null entity for class: " + classname);
+            return;
+        }
+        if (!s_Emitter) {
+            BossSignalConfig.Warn("EmitBossSpawned called before BossSignal emitter init." + " Make sure @BossSignal loads before your boss mod.");
+            return;
+        }
+        s_Emitter.OnBossSpawned(entity, classname);
+    }
+
+
+    // ?? EmitBossDespawned ????????????????????????????????????
+    // Call if your boss can despawn without being killed.
+    // ?????????????????????????????????????????????????????????
+    static void EmitBossDespawned(EntityAI entity, string classname) {
+        if (!entity || !s_Emitter) return;
+        s_Emitter.OnBossDespawned(entity, classname);
+    }
+
+
+    // ?? EmitCustom ???????????????????????????????????????????
+    // Send a freeform event associated with a boss entity.
+    // extraJsonFields: raw JSON field list (no wrapping braces), e.g.:
+    //   "\"phase\":2,\"message\":\"Enrage\""
+    // ?????????????????????????????????????????????????????????
+    static void EmitCustom(string bossId, string eventType, string extraJsonFields) {
+        if (!s_Emitter) return;
+        s_Emitter.OnCustomBossEvent(bossId, eventType, extraJsonFields);
+    }
+
+
+    // ?? GetEntityId ??????????????????????????????????????????
+    // Returns the BossSignal session-scoped entity ID string.
+    // Use this if you call EmitCustom and need the correct boss_id.
+    // ?????????????????????????????????????????????????????????
+    static string GetEntityId(EntityAI entity) {
+        if (!entity) return "null";
+        // entity.GetID().ToString() gives a stable ID for the entity's session
+        // lifetime. It is not persistent across server restarts.
+        return entity.GetID().ToString();
+    }
+
+
+    // ?? GetEncounterIdForBoss ?????????????????????????????????
+    // Returns the backend-known in-game bossId string for the given boss
+    // entity, or "" if no active encounter is being tracked.
+    // Used by TrophyHunter at kill-time to look up the top damager via the
+    // backend's /api/v1/servers/{server_id}/active-boss/{boss_id}/top-damager
+    // alias endpoint.
+    static string GetEncounterIdForBoss(EntityAI bossEntity) {
+        if (!bossEntity) return "";
+        if (!s_Emitter) return "";
+        return s_Emitter.GetEncounterIdForBoss(bossEntity);
+    }
+
+
+    // ?? Internal helpers ??????????????????????????????????????
+    static bool IsRegistered(string classname) {
+        if (!s_Registry) return false;
+        return s_Registry.Contains(classname);
+    }
+
+    static BossRegistration GetRegistration(string classname) {
+        if (!s_Registry || !s_Registry.Contains(classname)) return null;
+        return s_Registry.Get(classname);
+    }
+};

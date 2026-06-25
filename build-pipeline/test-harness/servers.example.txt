@@ -1,0 +1,11 @@
+# BossSignal simulator — servers list for --all-servers mode.
+#
+# One server_id per line. Blank lines and `#` comments are ignored.
+# Copy this file to `servers.txt` (gitignored) and replace these placeholders
+# with your own server IDs so the dashboard preview matches your network.
+#
+# Usage:
+#   python simulate_boss_encounter.py --all-servers --servers-file servers.txt ...
+
+Server-A
+Server-B

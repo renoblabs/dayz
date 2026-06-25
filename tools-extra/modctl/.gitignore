@@ -1,0 +1,8 @@
+.modctl/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.mypy_cache/

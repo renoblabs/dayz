@@ -1,0 +1,89 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+.env
+.env.local
+.env.*.local
+build/
+dist/
+*.egg
+
+# Node
+node_modules/
+.next/
+.nuxt/
+.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Project-specific
+*.log
+*.pid
+logs/
+scraper-cache/
+output/
+
+# DayZ build artifacts
+*.pbo
+*.pbo.*.bisign
+
+# Signing keys - NEVER commit private keys
+*.biprivatekey
+
+# Secrets
+*.key
+*.pem
+secrets/
+
+# Databases and runtime state
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+pg_data/
+
+# Backend generated output
+backends/bosssignal-backend/static/index.html
+backends/bosssignal-backend/static/assets/
+backends/bosssignal-backend/scratch/
+
+# Dev server logs
+vite_out.txt
+
+# Local: real server ids for preview testing (never commit)
+test-harness/servers.txt
+
+# Claude Code session-local
+.claude/
+
+# Working dirs (not source)
+_design-handoff-staging/
+
+# ralphex progress logs
+.ralphex/progress/
+.ralphex/config
+.modctl/state.json
+
+# Local tool installs
+tools-extra/steamcmd/
+
+# Bundled SteamCMD bootstrapper - download from Valve instead
+tools-extra/steamcmd.zip
+
+# Wiki content — published to the GitHub Wiki (separate repo), not the main tree
+droid-wiki/
+
+# Windows crash dumps
+*.stackdump

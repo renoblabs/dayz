@@ -1,0 +1,596 @@
+/* ─────────────────────────────────────────────────────────────────
+   CHROME UTILITIES
+   Custom panel + chip + dot + scanline + slide-in classes that don't
+   map cleanly to Tailwind utilities. Source of truth:
+   _design-handoff-staging/.../styles.css. Imported above @tailwind
+   directives in index.css so Tailwind utility classes can override
+   any of these in panel JSX.
+   ───────────────────────────────────────────────────────────────── */
+
+/* ─── TYPOGRAPHY UTILITIES ──────────────────────────────────────── */
+.t-display {
+  font-family: var(--f-display);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.t-stencil {
+  font-family: var(--f-display);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.t-mono {
+  font-family: var(--f-mono);
+  font-feature-settings: "tnum" 1;
+}
+.t-label {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+.t-num {
+  font-family: var(--f-display);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── CHROME ATOMS ──────────────────────────────────────────────── */
+.panel {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  position: relative;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+}
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+.panel-title .corner {
+  width: 8px; height: 8px;
+  border-left: 1px solid var(--amber);
+  border-top: 1px solid var(--amber);
+}
+.panel-body {
+  padding: 14px;
+}
+
+/* tactical corner ticks — L-brackets in opposite corners */
+.tick-corners::before,
+.tick-corners::after {
+  content: "";
+  position: absolute;
+  width: 10px; height: 10px;
+  border-color: var(--line-hard);
+  border-style: solid;
+  pointer-events: none;
+}
+.tick-corners::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+.tick-corners::after  { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+
+/* ─── BUTTONS / CHIPS ───────────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  border-radius: var(--r-sm);
+  transition: all 0.12s ease;
+}
+.chip:hover { border-color: var(--line-hard); color: var(--fg); }
+.chip.active {
+  background: var(--amber-soft);
+  border-color: var(--amber-line);
+  color: var(--amber);
+}
+.chip .count {
+  color: var(--fg-4);
+  font-size: 9.5px;
+}
+.chip.active .count { color: var(--amber); opacity: 0.8; }
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg-2);
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.btn-ghost:hover { background: var(--bg-2); color: var(--fg); border-color: var(--line-hard); }
+.btn-ghost:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ─── DOTS + STATUS ─────────────────────────────────────────────── */
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot.ok    { background: var(--ok);    box-shadow: 0 0 8px var(--ok); }
+.dot.warn  { background: var(--warn);  box-shadow: 0 0 8px var(--warn); }
+.dot.bad   { background: var(--bad);   box-shadow: 0 0 8px var(--bad); }
+.dot.amber { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+.dot.idle  { background: var(--fg-4); }
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 var(--amber-line); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.dot.live {
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+/* ─── EVENT ROW SLIDE-IN (Task 6 OPS Event Feed uses .fresh class) ─ */
+@keyframes slide-in {
+  0%   { opacity: 0; transform: translateY(-6px); background: var(--amber-soft); }
+  60%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 1; background: transparent; }
+}
+.event-row.fresh {
+  animation: slide-in 1.6s ease-out;
+}
+
+/* ─── SCROLLBAR ─────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--line-hard); }
+
+/* ─── TOP RAIL ──────────────────────────────────────────────────── */
+.toprail {
+  display: flex;
+  align-items: stretch;
+  height: 48px;
+  border-bottom: 1px solid var(--line-hard);
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.toprail .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  border-right: 1px solid var(--line);
+}
+.brand-mark {
+  width: 28px; height: 28px;
+  border: 1.5px solid var(--amber);
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+.brand-mark::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--amber);
+  opacity: 0.5;
+}
+.brand-mark span {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: var(--amber);
+}
+.brand-name {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  color: var(--fg);
+}
+.brand-sub {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  color: var(--fg-4);
+  text-transform: uppercase;
+}
+
+.toprail .nav {
+  display: flex;
+  align-items: stretch;
+}
+.nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  font-family: var(--f-display);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  border-right: 1px solid var(--line);
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  text-decoration: none;
+}
+.nav-tab .kbd { display: none; }
+.nav-tab.active .kbd { display: inline-block; }
+.nav-tab:hover { color: var(--fg); background: var(--bg-2); }
+.nav-tab.active { color: var(--amber); }
+.nav-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: var(--amber);
+  box-shadow: 0 0 8px var(--amber);
+}
+
+.toprail .meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.10em;
+  color: var(--fg-3);
+  text-transform: uppercase;
+}
+.toprail .search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-inset);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--fg-3);
+  cursor: text;
+}
+.toprail .search kbd {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  border: 1px solid var(--line);
+  padding: 1px 5px;
+  color: var(--fg-3);
+  background: var(--bg-2);
+}
+
+/* ─── BOTTOM HEALTH STRIP ───────────────────────────────────────── */
+.healthstrip {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 14px;
+  border-top: 1px solid var(--line-hard);
+  background: var(--bg-1);
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  gap: 20px;
+}
+.healthstrip .item { display: inline-flex; align-items: center; gap: 8px; }
+.healthstrip .item .label { color: var(--fg-4); }
+.healthstrip .item .value { color: var(--fg-2); }
+
+/* ─── DATA BARS / SPARKS ────────────────────────────────────────── */
+.bar-track {
+  height: 4px;
+  background: var(--bg-inset);
+  position: relative;
+  overflow: hidden;
+}
+.bar-fill {
+  position: absolute; inset: 0 auto 0 0;
+  background: var(--amber);
+  box-shadow: 0 0 6px var(--amber);
+}
+
+/* ─── CRT-ish glow on live regions ──────────────────────────────── */
+.live-region {
+  position: relative;
+}
+.live-region::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 2px,
+      rgba(255,255,255,0.012) 2px,
+      rgba(255,255,255,0.012) 3px
+    );
+  opacity: calc(var(--glow-strength));
+}
+
+/* CRT overlay — fixed, page-wide; opt-in via class on body or root */
+.crt-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9997;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 2px,
+      rgba(255,255,255,0.012) 2px,
+      rgba(255,255,255,0.012) 3px
+    );
+  opacity: calc(var(--glow-strength) * 0.5);
+}
+
+/* ─── MISC ──────────────────────────────────────────────────────── */
+.divider-h {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line), transparent);
+  margin: 14px 0;
+}
+.kbd {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  border: 1px solid var(--line);
+  padding: 1px 5px;
+  color: var(--fg-3);
+  background: var(--bg-2);
+  border-radius: 2px;
+}
+
+/* ─── HERO STRIP ────────────────────────────────────────────────── */
+.hero-strip {
+  position: relative;
+  height: 110px;
+  border-bottom: 1px solid var(--line-hard);
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 50%, rgba(0,0,0,0.7) 100%),
+    radial-gradient(ellipse at 20% 50%, oklch(0.30 0.04 30 / 0.4), transparent 60%),
+    radial-gradient(ellipse at 80% 50%, oklch(0.25 0.03 165 / 0.5), transparent 70%),
+    linear-gradient(180deg, var(--bg-2) 0%, var(--bg-0) 100%);
+  overflow: hidden;
+}
+.hero-strip::before {
+  content: "";
+  position: absolute; inset: 0;
+  background:
+    repeating-linear-gradient(to right, transparent 0, transparent 39px, rgba(255,255,255,0.025) 39px, rgba(255,255,255,0.025) 40px),
+    repeating-linear-gradient(to bottom, transparent 0, transparent 19px, rgba(255,255,255,0.02) 19px, rgba(255,255,255,0.02) 20px);
+  pointer-events: none;
+}
+.hero-strip .hero-content {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 28px;
+}
+.hero-strip .hero-title {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 32px;
+  letter-spacing: 0.20em;
+  color: var(--fg);
+  text-transform: uppercase;
+  text-shadow: 0 0 20px rgba(0,0,0,0.8);
+}
+.hero-strip .hero-tag {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.20em;
+  color: var(--amber);
+  text-transform: uppercase;
+  margin-top: 4px;
+  text-shadow: 0 0 8px var(--amber-soft);
+}
+.hero-strip .hero-meta {
+  margin-left: auto;
+  display: flex;
+  gap: 28px;
+  align-items: stretch;
+}
+.hero-stat {
+  text-align: right;
+}
+.hero-stat .v {
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--fg);
+  letter-spacing: 0.04em;
+}
+.hero-stat .l {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  color: var(--fg-4);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.hero-rack {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 200px;
+  pointer-events: none;
+  opacity: 0.35;
+}
+.hero-rack.left  { left: 30%; transform: skewX(-8deg); }
+.hero-rack.right { right: 30%; transform: skewX(8deg); }
+
+/* ─── SERVER CARD MAP BACKGROUND ───────────────────────────────── */
+.server-card-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
+  z-index: 0;
+}
+.server-card-bg svg {
+  height: 110%;
+  width: auto;
+  color: var(--amber);
+  opacity: 0.10;
+  filter: drop-shadow(0 0 10px var(--amber));
+}
+
+/* ─── KB BLUEPRINT BACKDROP (Task 7) ───────────────────────────── */
+.blueprint-bg {
+  background-image:
+    linear-gradient(rgba(120,160,180,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120,160,180,0.025) 1px, transparent 1px),
+    linear-gradient(rgba(120,160,180,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120,160,180,0.06) 1px, transparent 1px);
+  background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+}
+
+/* ─── EMPTY STATE ──────────────────────────────────────────────── */
+.empty-illo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 36px 24px 44px;
+  text-align: center;
+}
+
+/* ─── RADAR SWEEP (empty event feed) ───────────────────────────── */
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.radar-sweep {
+  width: 64px; height: 64px;
+  border: 1px solid var(--line-hard);
+  border-radius: 50%;
+  position: relative;
+  background:
+    radial-gradient(circle at center, transparent 0, transparent 22px, var(--line-soft) 23px, transparent 24px),
+    radial-gradient(circle at center, transparent 0, transparent 12px, var(--line-soft) 13px, transparent 14px);
+}
+.radar-sweep::after {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 32px;
+  height: 1px;
+  background: linear-gradient(to right, var(--amber), transparent);
+  transform-origin: left center;
+  animation: radar-sweep 4s linear infinite;
+}
+
+/* ─── DEMO DATA CHIP (any panel rendering mock data) ──────────── */
+.demo-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  background: oklch(0.78 0.15 90 / 0.12);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border-radius: 2px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   MOBILE / NARROW-VIEWPORT FIXES (≤ 900px)
+
+   Per design intent: dashboard is desktop-primary. These media queries
+   prevent visual breakage on phones — they DO NOT redesign the layout.
+   Specifically:
+     - Top rail: 8 tabs scroll horizontally instead of wrapping or
+       clipping. Right-side cluster collapses.
+     - Two-column page layouts (OPS row 2, PLAYERS, ENCOUNTERS, ALERTS)
+       stack vertically when the page wraps `<main>` with `.stack-on-mobile`.
+       (We use !important to override the page's inline gridTemplateColumns.)
+     - Health strip scrolls horizontally; doesn't push content off-screen.
+     - TweaksPanel: floating button stays accessible.
+   ───────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .toprail {
+    height: 44px;
+  }
+  .toprail .brand {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .toprail .brand-name { font-size: 12px; }
+  .toprail .brand-sub  { display: none; }
+
+  .toprail .nav {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .toprail .nav::-webkit-scrollbar { height: 2px; }
+  .nav-tab { padding: 0 10px; font-size: 10px; }
+
+  /* Right-cluster: clock + search hint are non-essential on mobile */
+  .toprail .meta {
+    gap: 8px;
+    padding: 0 8px;
+    font-size: 9.5px;
+  }
+  .toprail .meta .search { display: none; }
+
+  /* Two-column page layouts: force single-column stack.
+     Pages opt-in by adding className="stack-on-mobile" to <main>. */
+  .stack-on-mobile {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Health strip: scroll horizontally rather than wrap */
+  .healthstrip {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Tweaks panel: smaller floating button label on narrow screens */
+}
